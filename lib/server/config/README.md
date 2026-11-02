@@ -5,11 +5,11 @@ boundary. Importing these modules defines schemas only; it does not read environ
 variables, construct clients, or open connections. All modules use Next.js's
 `server-only` marker to prevent imports into Client Components.
 
-| Reader | Required variables | Returned configuration |
-| --- | --- | --- |
-| `readRuntimeDatabaseConfig` from `./runtime` | `DATABASE_URL` | `{ databaseUrl }` for runtime access only |
-| `readModelConfig` from `./model` | `OPENAI_API_KEY`, `OPENAI_MODEL` | `{ apiKey, model }` with no model default |
-| `readMigrationConfig` from `./migration` | `DATABASE_URL`, `MIGRATION_DATABASE_URL` | `{ databaseUrl }` containing only the migration URL |
+| Reader                                       | Required variables                       | Returned configuration                              |
+| -------------------------------------------- | ---------------------------------------- | --------------------------------------------------- |
+| `readRuntimeDatabaseConfig` from `./runtime` | `DATABASE_URL`                           | `{ databaseUrl }` for runtime access only           |
+| `readModelConfig` from `./model`             | `OPENAI_API_KEY`, `OPENAI_MODEL`         | `{ apiKey, model }` with no model default           |
+| `readMigrationConfig` from `./migration`     | `DATABASE_URL`, `MIGRATION_DATABASE_URL` | `{ databaseUrl }` containing only the migration URL |
 
 Use the returned model configuration when constructing the model client. Do not
 log or serialize reader results: they contain credentials. Validation throws plain
@@ -49,6 +49,10 @@ the human. Do not print returned secrets or commit local configuration.
    printing either URL. Missing or malformed URLs should identify the affected
    variable. Repeat with a host or port override in the query string: it should
    be rejected.
+
+```
+npx --no-install tsx --conditions=react-server --env-file=.env.local lib/server/config/confirm.ts
+```
 
 G03 adds configuration readers only. Database/model client initialization and
 migration commands belong to later goals. No database operation is needed for
