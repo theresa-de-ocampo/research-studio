@@ -22,7 +22,7 @@ Immediately stop execution if any of the following conditions are encountered. D
 - **Database Changes:** Creating, altering, or deleting database objects, roles, or permissions is required.
 - **Permission Issues:** Any permission or access restriction prevents progress.
 - **Database Migrations:** A database migration needs to be executed.
-- **Testing:** Testing or verification is required. Do not create or run tests unless explicitly requested. A human will verify each completed goal.
+- **Testing:** Creating or running automated tests is required. Linting and static type checking are allowed. A human will manually verify each completed goal.
 - **Package Installation:** Installing, updating, or removing dependencies is required.
 - **Docker:** Building images, starting containers, or running Docker services is required.
 - **Missing Credentials:** Required credentials or environment variables are missing or invalid.
