@@ -9,7 +9,11 @@ variables, construct clients, or open connections. All modules use Next.js's
 | -------------------------------------------- | ---------------------------------------- | --------------------------------------------------- |
 | `readRuntimeDatabaseConfig` from `./runtime` | `DATABASE_URL`                           | `{ databaseUrl }` for runtime access only           |
 | `readModelConfig` from `./model`             | `OPENAI_API_KEY`, `OPENAI_MODEL`         | `{ apiKey, model }` with no model default           |
-| `readMigrationConfig` from `./migration`     | `DATABASE_URL`, `MIGRATION_DATABASE_URL` | `{ databaseUrl }` containing only the migration URL |
+
+Migration-only configuration lives in
+[`scripts/db/config.ts`](../../../scripts/db/config.ts), alongside the database
+command runner. Application modules must not import it. The URL and configuration
+validation helpers in this directory are shared by the application and scripts.
 
 Use the returned model configuration when constructing the model client. Do not
 log or serialize reader results: they contain credentials. Validation throws plain
@@ -18,8 +22,9 @@ errors containing variable names only, without input values or underlying errors
 Next.js loads local configuration from `.env.local`. The root `.env.example`
 contains placeholders only; replace them with human-supplied values in the ignored
 local file. Other environments supply values through their supported configuration
-mechanism. These readers do not load files themselves. Future standalone migration
-tooling must load its environment before calling the migration reader.
+mechanism. These readers do not load files themselves. The standalone database
+tooling loads its environment before calling the migration reader; see
+[database setup](../../../docs/database-setup.md).
 
 Database URLs must use `postgres://` or `postgresql://` and explicitly include a
 host, user, and database path. Use the same host, port, and database for both URLs,
@@ -43,12 +48,9 @@ the human. Do not print returned secrets or commit local configuration.
 3. Supply only the two model variables and call `readModelConfig`. The returned
    `model` should match `OPENAI_MODEL`. Omit either variable, or supply whitespace
    only: the error should name the invalid variable without exposing its value.
-4. Supply both database URLs with different credentials and the same target.
-   `readMigrationConfig` should return the migration URL. Change the host, port,
-   or database on one URL: the error should name both URL variables without
-   printing either URL. Missing or malformed URLs should identify the affected
-   variable. Repeat with a host or port override in the query string: it should
-   be rejected.
+
+Migration reader verification is documented separately in
+[database setup](../../../docs/database-setup.md#configuration-reader-verification).
 
 ```
 npx --no-install tsx --conditions=react-server --env-file=.env.local lib/server/config/confirm.ts
