@@ -47,3 +47,28 @@ human-managed tooling using migration credentials.
 
 G04 prepares runtime access modules only. It does not establish database
 connectivity or schema availability.
+
+## Conversation metadata schema
+
+`schema.ts` defines `public.conversations` using Drizzle's default PostgreSQL
+schema. It contains only a generated UUID primary key, a required text title, a
+required timezone-aware `created_at` defaulting to insertion time, and a nullable
+timezone-aware `updated_at` with no default. TypeScript properties use `createdAt`
+and `updatedAt`. New conversations leave `updatedAt` null until their first update.
+
+The `conversations_activity_idx` expression index supports
+`ORDER BY coalesce(updated_at, created_at) DESC, id DESC` for newest activity with
+a stable tie-breaker. Future listing queries must use that same ordering: a chat
+with no updates sorts by its creation time alongside previously updated chats.
+Future metadata mutation code must explicitly set `updatedAt` when activity changes.
+Use the conversation UUID directly as LangGraph's `thread_id`. Transcripts belong
+exclusively in checkpoint state; this schema defines no messages or auth tables.
+
+The schema module contains only source definitions and has no runtime client or
+configuration imports, so future Drizzle tooling can load it independently.
+G05 does not generate migrations or create database objects. The human generates,
+reviews, and applies migrations in G07 after G06 provides the setup tooling.
+
+For human verification, inspect the four columns, primary key, timestamp defaults,
+nullability, and activity index in `schema.ts` against `PLAN.md`. Confirm that there
+are no transcript columns or additional tables. No database connection is required.

@@ -60,7 +60,7 @@ PostgreSQL ownership controls the ability to alter or drop objects, so ownership
 | `langgraph.checkpoint_migrations` | PostgresSaver | None              |
 | `drizzle.__drizzle_migrations`    | Drizzle       | None              |
 
-Define `conversations` with UUID `id`, non-null `title`, and timezone-aware `created_at` and `updated_at`. Index activity ordering. Use its UUID as LangGraph’s `thread_id`.
+Define `conversations` with UUID `id`, non-null `title`, non-null timezone-aware `created_at` defaulting to creation time, and nullable timezone-aware `updated_at` with no default. Leave `updated_at` null on creation and set it explicitly on subsequent activity. Index and list by `coalesce(updated_at, created_at) DESC, id DESC` so new and updated conversations share newest-activity ordering with a deterministic tie-breaker. Use its UUID as LangGraph’s `thread_id`.
 
 Store messages only in checkpoint state; do not create a duplicate messages table. Retrieve transcripts through `graph.getState()`.
 
