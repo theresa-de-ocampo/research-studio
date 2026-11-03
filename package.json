@@ -8,9 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
-    "db:migrate": "tsx --conditions=react-server scripts/db.ts migrate",
-    "db:checkpoint-setup": "tsx --conditions=react-server scripts/db.ts checkpoint-setup",
-    "db:setup": "tsx --conditions=react-server scripts/db.ts setup"
+    "db:migrate": "tsx --conditions=react-server scripts/db/index.ts migrate",
+    "db:checkpoint-setup": "tsx --conditions=react-server scripts/db/index.ts checkpoint-setup",
+    "db:setup": "tsx --conditions=react-server scripts/db/index.ts setup"
   },
   "dependencies": {
     "@ai-sdk/langchain": "^3.0.159",

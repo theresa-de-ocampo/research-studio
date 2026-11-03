@@ -7,7 +7,7 @@ export const migrationOptions = {
   migrationsTable: "__drizzle_migrations",
 };
 
-// Generation reads source only; credentials belong to scripts/db.ts.
+// Generation reads source only; credentials belong to scripts/db/config.ts.
 export default defineConfig({
   dialect: "postgresql",
   schema: "./lib/server/db/schema.ts",

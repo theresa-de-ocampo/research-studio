@@ -6,8 +6,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 
-import { migrationOptions } from "../drizzle.config";
-import { readMigrationConfig } from "../lib/server/config/migration";
+import { migrationOptions } from "../../drizzle.config";
+import { readMigrationConfig } from "./config";
 
 let step = "validating the command";
 
