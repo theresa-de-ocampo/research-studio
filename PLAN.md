@@ -68,7 +68,7 @@ Store messages only in checkpoint state; do not create a duplicate messages tabl
 
 Drizzle owns conversation metadata migrations; PostgresSaver owns its checkpoint schema. The intended setup uses `MIGRATION_DATABASE_URL` for Drizzle migrations and `PostgresSaver.setup()` with the `langgraph` schema, followed by the required runtime grants. Setup must preserve existing conversations.
 
-The intended tooling includes `db:generate`, `db:migrate`, `db:checkpoint-setup`, and `db:setup`. A combined setup command would perform migrations, checkpoint setup, and grants sequentially. These describe the eventual tooling, not commands for an agent to execute from this overview. Any work on this tooling must be explicitly scoped and remain subject to `AGENTS.md`.
+The tooling includes `db:generate`, `db:migrate`, `db:checkpoint-setup`, and `db:setup`. Combined setup performs metadata migrations followed by checkpoint setup. Grants and default privileges remain separate human-managed operations; the commands do not modify them. See [database setup](docs/database-setup.md) and [role provisioning](docs/database-roles.md). These are commands for human execution, not commands for an agent to execute from this overview. Any work on this tooling must be explicitly scoped and remain subject to `AGENTS.md`.
 
 Database setup and migrations are explicit human-managed operations. Never run them inside chat requests or ordinary app startup. Do not create a substitute database or start Docker to bypass unavailable infrastructure. [Drizzle migration workflow](https://orm.drizzle.team/docs/drizzle-kit-migrate)
 

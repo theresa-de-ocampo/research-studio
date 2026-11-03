@@ -18,8 +18,9 @@ errors containing variable names only, without input values or underlying errors
 Next.js loads local configuration from `.env.local`. The root `.env.example`
 contains placeholders only; replace them with human-supplied values in the ignored
 local file. Other environments supply values through their supported configuration
-mechanism. These readers do not load files themselves. Future standalone migration
-tooling must load its environment before calling the migration reader.
+mechanism. These readers do not load files themselves. The standalone database
+tooling loads its environment before calling the migration reader; see
+[database setup](../../../docs/database-setup.md).
 
 Database URLs must use `postgres://` or `postgresql://` and explicitly include a
 host, user, and database path. Use the same host, port, and database for both URLs,

@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:migrate": "tsx --conditions=react-server scripts/db.ts migrate",
+    "db:checkpoint-setup": "tsx --conditions=react-server scripts/db.ts checkpoint-setup",
+    "db:setup": "tsx --conditions=react-server scripts/db.ts setup"
   },
   "dependencies": {
     "@ai-sdk/langchain": "^3.0.159",
