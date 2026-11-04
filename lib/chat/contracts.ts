@@ -12,60 +12,32 @@ export function getAssistantMessageId(userMessageId: string): string {
 
 export const assistantMessageIdSchema = z.string().regex(/^assistant:[A-Za-z0-9_-]{1,128}$/);
 
-const textPartSchema = z.strictObject({
-  type: z.literal("text"),
-  text: z.string(),
-  state: z.enum(["streaming", "done"]).optional(),
-});
-
-export const userMessageSchema = z.strictObject({
-  id: userMessageIdSchema,
-  role: z.literal("user"),
-  parts: z.array(textPartSchema).min(1),
-}).refine((message) => message.parts.some((part) => part.text.trim().length > 0), {
-  message: "Enter a non-empty message.",
-  path: ["parts"],
-});
-
-export const assistantMessageSchema = z.strictObject({
-  id: assistantMessageIdSchema,
-  role: z.literal("assistant"),
-  parts: z.array(textPartSchema),
-});
-
-export const chatMessageSchema = z.union([userMessageSchema, assistantMessageSchema]);
-
-// This is a narrowed SDK UIMessage, shared by useChat, streams, and reloads.
-export type ChatMessage = Omit<UIMessage<never, never, never>, "role" | "parts"> &
-  z.infer<typeof chatMessageSchema>;
-export type UserMessage = z.infer<typeof userMessageSchema>;
-
-// Do not accept SDK default transport fields or a messages/transcript array.
+// Application input policy only; loaded/streamed messages use SDK types directly.
 const submittedTextPartSchema = z.strictObject({
   type: z.literal("text"),
   text: z.string(),
 });
 
-export const turnInputSchema = z.strictObject({
-  message: z.strictObject({
-    id: userMessageIdSchema,
-    role: z.literal("user"),
-    parts: z.array(submittedTextPartSchema).min(1),
-  }).refine((message) => message.parts.some((part) => part.text.trim().length > 0), {
-    message: "Enter a non-empty message.",
-    path: ["parts"],
-  }),
+export const submitMessageInputSchema = z.strictObject({
+  id: userMessageIdSchema,
+  role: z.literal("user"),
+  parts: z.array(submittedTextPartSchema).min(1),
+}).refine((message) => message.parts.some((part) => part.text.trim().length > 0), {
+  message: "Enter a non-empty message.",
+  path: ["parts"],
 });
-export type TurnInput = z.infer<typeof turnInputSchema>;
+export type SubmitMessageInput = z.infer<typeof submitMessageInputSchema>;
+
+export const conversationTitleSchema = z.string().trim().min(1).max(200);
 
 export const renameInputSchema = z.strictObject({
-  title: z.string().trim().min(1).max(200),
+  title: conversationTitleSchema,
 });
 export type RenameInput = z.infer<typeof renameInputSchema>;
 
 export const conversationMetadataSchema = z.strictObject({
   id: conversationIdSchema,
-  title: z.string().min(1),
+  title: conversationTitleSchema,
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }).nullable(),
 });
@@ -80,12 +52,11 @@ export const pendingTurnSchema = z.strictObject({
 });
 export type PendingTurn = z.infer<typeof pendingTurnSchema>;
 
-export const conversationDetailSchema = z.strictObject({
-  conversation: conversationMetadataSchema,
-  messages: z.array(chatMessageSchema),
-  pendingTurn: pendingTurnSchema.nullable(),
-});
-export type ConversationDetail = z.infer<typeof conversationDetailSchema>;
+export type Conversation = {
+  conversation: ConversationMetadata;
+  messages: UIMessage[];
+  pendingTurn: PendingTurn | null;
+};
 
 export const conversationListSchema = z.strictObject({
   conversations: z.array(conversationMetadataSchema),
