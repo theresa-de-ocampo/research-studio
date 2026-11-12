@@ -165,6 +165,7 @@ export async function withConversationLock<T>(
       result = { status: "completed", value };
     }
   } catch (error) {
+    // Log error now, errors thrown in finally block overwrites the original exception
     console.error("Conversation operation failed.", { conversationId }, error);
     throw error;
   } finally {
@@ -183,6 +184,7 @@ export async function withConversationLock<T>(
           }
         }
       } catch (error) {
+        // Log error now, errors thrown in finally block overwrites the original exception
         console.error("Conversation unlock failed.", { conversationId }, error);
         discardClient = true;
         throw toConversationLockError(error);
