@@ -9,6 +9,3 @@ See [PLAN.md](PLAN.md) for the application architecture and scope, and
 
 [Code structure](docs/code-structure.md) explains where code belongs and links to
 goal-specific implementation notes.
-
-[Database setup](docs/database-setup.md) documents the human-invoked preparation
-commands and the separate human-managed role and grant requirements.
