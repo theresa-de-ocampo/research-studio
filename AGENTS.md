@@ -10,6 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Coding Guidelines
 
+- Follow [docs/code-structure.md](docs/code-structure.md) for file placement and naming. Keep goal-specific implementation notes in `docs/<goal-ID>.md` (for example, `docs/G03.md`) instead of adding nested `README.md` files.
 - Always use curly braces `{}` for control flow statements (`if`, `else`, `for`, `while`, etc.), even for single-line bodies. Never use inline control flow statements such as `if (recipe) return recipe;`.
 - Use **only one `return` statement per function**. Avoid early returns. Use conditional logic to determine the result before returning.
 - Do not create or modify tests unless explicitly requested.

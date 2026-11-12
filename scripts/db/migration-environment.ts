@@ -1,17 +1,8 @@
 import "server-only";
 
-import { z } from "zod";
-
-import {
-  databaseUrlSchema,
-  getDatabaseTarget,
-} from "../../lib/server/config/database-url";
-import { validateConfig } from "../../lib/server/config/validation";
-
-const migrationSchema = z.object({
-  DATABASE_URL: databaseUrlSchema,
-  MIGRATION_DATABASE_URL: databaseUrlSchema,
-});
+import { migrationSchema } from "../../lib/schemas/environment";
+import { getDatabaseTarget } from "../../lib/server/db/database-target";
+import { validateConfig } from "../../lib/server/environment";
 
 export function readMigrationConfig() {
   const config = validateConfig(migrationSchema, {

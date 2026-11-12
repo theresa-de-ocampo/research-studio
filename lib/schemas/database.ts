@@ -1,5 +1,3 @@
-import "server-only";
-
 import { z } from "zod";
 
 function isPostgresUrl(value: string): boolean {
@@ -37,13 +35,3 @@ function isPostgresUrl(value: string): boolean {
 
 export const databaseUrlSchema = z.string().min(1).refine(isPostgresUrl);
 
-// Only call after databaseUrlSchema has validated the connection string.
-export function getDatabaseTarget(connectionString: string) {
-  const url = new URL(connectionString);
-
-  return {
-    host: decodeURIComponent(url.hostname).toLowerCase(),
-    port: url.port || "5432",
-    database: decodeURI(url.pathname.slice(1)),
-  };
-}

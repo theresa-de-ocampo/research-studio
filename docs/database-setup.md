@@ -10,7 +10,7 @@ Run from the repository root with the installed dependencies:
 
 | Command | Effect |
 | --- | --- |
-| `npm.cmd run db:generate` | Generate SQL and snapshots in `drizzle/` from `lib/server/db/schema.ts`; no credentials or database connection required. |
+| `npm.cmd run db:generate` | Generate SQL and snapshots in `drizzle/` from `lib/server/db/tables.ts`; no credentials or database connection required. |
 | `npm.cmd run db:migrate` | Apply reviewed, pending Drizzle migrations using migration credentials. |
 | `npm.cmd run db:checkpoint-setup` | Run `PostgresSaver.setup()` for the `langgraph` schema using migration credentials. |
 | `npm.cmd run db:setup` | Apply metadata migrations, then set up checkpoints; stop on failure. |
@@ -25,9 +25,12 @@ scripts for applying migrations, rather than `drizzle-kit migrate` or `push`.
 
 The command runner is [`scripts/db/index.ts`](../scripts/db/index.ts). Its
 migration-only configuration reader lives alongside it in
-[`scripts/db/config.ts`](../scripts/db/config.ts). Application configuration stays
-under `lib/server/config/`; the scripts reuse that directory's shared URL and
-validation helpers without adding migration configuration to application modules.
+[`scripts/db/migration-environment.ts`](../scripts/db/migration-environment.ts).
+Application environment readers live in
+[`lib/server/environment.ts`](../lib/server/environment.ts). The scripts reuse
+its sanitized validation helper, the pure schemas in `lib/schemas/`, and
+`lib/server/db/database-target.ts` without adding migration credential selection
+to application modules.
 
 The three database commands load optional local `.env*` files with `@next/env`,
 including `.env.local` (except under `NODE_ENV=test`), using Next.js precedence.
@@ -36,7 +39,7 @@ supplied through the environment take precedence, so Cloud does not need a local
 file. No file, credential, or reachable database is assumed to exist. Keep secrets
 in ignored local files or human-supplied environment configuration.
 
-`readMigrationConfig()` from `scripts/db/config.ts` requires `DATABASE_URL` and
+`readMigrationConfig()` from `scripts/db/migration-environment.ts` requires `DATABASE_URL` and
 `MIGRATION_DATABASE_URL` and verifies matching host, port, and database. Only the
 migration URL is returned and passed to the temporary pool. The runtime URL is
 used only for target comparison; there is no credential fallback. Model settings
@@ -50,7 +53,7 @@ continue to use only the existing runtime reader and shared runtime pool.
 
 ## Configuration reader verification
 
-For human verification, import `readMigrationConfig` from `scripts/db/config.ts`
+For human verification, import `readMigrationConfig` from `scripts/db/migration-environment.ts`
 in a standalone server context using `tsx --conditions=react-server`. Importing
 the reader does not load environment files, validate values, or connect to the
 database; validation occurs when the reader is called.

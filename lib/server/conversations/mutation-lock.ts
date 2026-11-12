@@ -2,11 +2,10 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
-import { z } from "zod";
 
+import { conversationIdSchema } from "../../schemas/chat";
 import { getRuntimePool } from "../db/pool";
 
-const conversationUuidSchema = z.uuid();
 const CONNECTION_TIMEOUT_MS = 5_000;
 const LOCK_QUERY_TIMEOUT_MS = 5_000;
 
@@ -32,7 +31,7 @@ function toConversationLockError(cause: unknown): ConversationLockError {
 }
 
 export function getConversationLockKey(conversationId: string): string {
-  const uuid = conversationUuidSchema.parse(conversationId).toLowerCase();
+  const uuid = conversationIdSchema.parse(conversationId);
   const digest = createHash("sha256")
     .update(`research-studio:conversation:${uuid}`)
     .digest();
