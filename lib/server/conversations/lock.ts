@@ -63,22 +63,25 @@ function checkoutLockClient(signal: AbortSignal): Promise<PoolClient> {
     if (signal.aborted) {
       onAbort();
     } else {
-      void pool.connect().then((client) => {
-        if (settled) {
-          // A cancelled/timed-out checkout must not leak a late connection.
-          client.release();
-        } else {
-          settled = true;
-          cleanup();
-          resolve(client);
+      void pool.connect().then(
+        (client) => {
+          if (settled) {
+            // A cancelled/timed-out checkout must not leak a late connection.
+            client.release();
+          } else {
+            settled = true;
+            cleanup();
+            resolve(client);
+          }
+        },
+        () => {
+          if (!settled) {
+            settled = true;
+            cleanup();
+            reject(new ConversationLockError());
+          }
         }
-      }, () => {
-        if (!settled) {
-          settled = true;
-          cleanup();
-          reject(new ConversationLockError());
-        }
-      });
+      );
     }
   });
 }
@@ -91,12 +94,17 @@ function checkoutLockClient(signal: AbortSignal): Promise<PoolClient> {
 export async function withConversationLock<T>(
   conversationId: string,
   operation: (signal: AbortSignal) => Promise<T>,
-  options: { signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal } = {}
 ): Promise<ConversationLockResult<T>> {
   const key = getConversationLockKey(conversationId);
   const controller = new AbortController();
   const cancel = () => {
-    controller.abort(new DOMException("The conversation operation was cancelled.", "AbortError"));
+    controller.abort(
+      new DOMException(
+        "The conversation operation was cancelled.",
+        "AbortError"
+      )
+    );
   };
 
   options.signal?.addEventListener("abort", cancel, { once: true });
@@ -128,7 +136,7 @@ export async function withConversationLock<T>(
       const lockQuery = {
         text: "SELECT pg_try_advisory_lock($1::bigint) AS acquired",
         values: [key],
-        query_timeout: LOCK_QUERY_TIMEOUT_MS,
+        query_timeout: LOCK_QUERY_TIMEOUT_MS
       };
       const lock = await client.query<{ acquired: boolean }>(lockQuery);
       if (typeof lock.rows[0]?.acquired !== "boolean") {
@@ -150,11 +158,11 @@ export async function withConversationLock<T>(
     options.signal?.removeEventListener("abort", cancel);
     if (client) {
       try {
-        if (acquired && !discardClient) {
+        if (acquired && !connectionFailed) {
           const unlockQuery = {
             text: "SELECT pg_advisory_unlock($1::bigint) AS released",
             values: [key],
-            query_timeout: LOCK_QUERY_TIMEOUT_MS,
+            query_timeout: LOCK_QUERY_TIMEOUT_MS
           };
           const unlock = await client.query<{ released: boolean }>(unlockQuery);
           if (unlock.rows[0]?.released !== true) {
