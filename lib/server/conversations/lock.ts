@@ -15,10 +15,20 @@ export type ConversationLockResult<T> =
   | { status: "completed"; value: T };
 
 export class ConversationLockError extends Error {
-  constructor() {
-    super("Conversation locking is unavailable.");
+  constructor(options?: ErrorOptions) {
+    super("Conversation locking is unavailable.", options);
     this.name = "ConversationLockError";
   }
+}
+
+function toConversationLockError(cause: unknown): ConversationLockError {
+  let error: ConversationLockError;
+  if (cause instanceof ConversationLockError) {
+    error = cause;
+  } else {
+    error = new ConversationLockError({ cause });
+  }
+  return error;
 }
 
 export function getConversationLockKey(conversationId: string): string {
@@ -74,11 +84,11 @@ function checkoutLockClient(signal: AbortSignal): Promise<PoolClient> {
             resolve(client);
           }
         },
-        () => {
+        (error) => {
           if (!settled) {
             settled = true;
             cleanup();
-            reject(new ConversationLockError());
+            reject(toConversationLockError(error));
           }
         }
       );
@@ -118,10 +128,10 @@ export async function withConversationLock<T>(
   let connectionFailed = false;
   let result: ConversationLockResult<T> = { status: "busy" };
 
-  const onConnectionError = () => {
+  const onConnectionError = (error: Error) => {
     connectionFailed = true;
     discardClient = true;
-    controller.abort(new ConversationLockError());
+    controller.abort(toConversationLockError(error));
   };
 
   try {
@@ -144,8 +154,8 @@ export async function withConversationLock<T>(
       }
       acquired = lock.rows[0].acquired;
       discardClient = connectionFailed;
-    } catch {
-      throw new ConversationLockError();
+    } catch (error) {
+      throw toConversationLockError(error);
     }
 
     controller.signal.throwIfAborted();
@@ -154,6 +164,9 @@ export async function withConversationLock<T>(
       controller.signal.throwIfAborted();
       result = { status: "completed", value };
     }
+  } catch (error) {
+    console.error("Conversation operation failed.", { conversationId }, error);
+    throw error;
   } finally {
     options.signal?.removeEventListener("abort", cancel);
     if (client) {
@@ -169,9 +182,10 @@ export async function withConversationLock<T>(
             throw new ConversationLockError();
           }
         }
-      } catch {
+      } catch (error) {
+        console.error("Conversation unlock failed.", { conversationId }, error);
         discardClient = true;
-        throw new ConversationLockError();
+        throw toConversationLockError(error);
       } finally {
         // Never return a possibly locked or broken session to the shared pool.
         client.release(discardClient);
