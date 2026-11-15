@@ -1,19 +1,20 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
+import type { PoolClient } from "pg";
 
 import { conversationIdSchema } from "@/lib/schemas/chat";
-import type { ConversationLockState } from "@/types/server/conversation-lock";
 
 import { toConversationLockError } from "./lock-error";
 import { acquireLock } from "./acquire-lock";
-import { cleanUp } from "./clean-up";
 import { getDbConnection } from "./get-db-connection";
+import { releaseLock } from "./release-lock";
 
 export type ConversationLockResult<T> =
   | { status: "busy" }
   | { status: "completed"; value: T };
 
+/** Derives a stable advisory-lock key from a validated conversation UUID. */
 function getConversationLockKey(conversationId: string): string {
   const uuid = conversationIdSchema.parse(conversationId);
   const digest = createHash("sha256")
@@ -25,9 +26,8 @@ function getConversationLockKey(conversationId: string): string {
 }
 
 /**
- * The callback promise must cover ALL mutation, stream, and checkpoint work.
- * Do not resolve it with an unconsumed stream/Response or detached background work.
- * Cancellation is cooperative: await the operation's shutdown before releasing.
+ * Runs an operation under a conversation lock, or reports busy.
+ * The callback must honor cancellation and await all mutations, streams, and checkpoints.
  */
 export async function withConversationLock<T>(
   conversationId: string,
@@ -50,35 +50,32 @@ export async function withConversationLock<T>(
     cancel();
   }
 
-  const state: ConversationLockState = {
-    client: undefined,
-    acquired: false,
-    discardClient: false,
-    connectionFailed: false
-  };
+  let client: PoolClient | undefined;
+  let acquired = false;
+  let discardClient = false;
+  let connectionFailed = false;
   let result: ConversationLockResult<T> = { status: "busy" };
 
   const onConnectionError = (error: Error) => {
-    state.connectionFailed = true;
-    state.discardClient = true;
+    connectionFailed = true;
+    discardClient = true;
     controller.abort(toConversationLockError(error));
   };
 
   try {
     controller.signal.throwIfAborted();
-    const client = await getDbConnection(controller.signal);
-    state.client = client;
+    client = await getDbConnection(controller.signal);
     client.on("error", onConnectionError);
     controller.signal.throwIfAborted();
 
     // If acquisition fails, the connection may still hold the session lock.
-    state.discardClient = true;
-    state.acquired = await acquireLock(client, key);
+    discardClient = true;
+    acquired = await acquireLock(client, key);
     // Preserve any connection failure reported while acquisition was pending.
-    state.discardClient = state.connectionFailed;
+    discardClient = connectionFailed;
 
     controller.signal.throwIfAborted();
-    if (state.acquired) {
+    if (acquired) {
       const value = await operation(controller.signal);
       controller.signal.throwIfAborted();
       result = { status: "completed", value };
@@ -88,13 +85,23 @@ export async function withConversationLock<T>(
     console.error("Conversation operation failed.", { conversationId }, error);
     throw error;
   } finally {
-    await cleanUp(state, {
-      conversationId,
-      key,
-      signal: options.signal,
-      cancel,
-      onConnectionError
-    });
+    options.signal?.removeEventListener("abort", cancel);
+    if (client) {
+      try {
+        if (acquired && !connectionFailed) {
+          await releaseLock(client, key);
+        }
+      } catch (error) {
+        // Log before a cleanup error replaces the original operation error.
+        console.error("Conversation unlock failed.", { conversationId }, error);
+        discardClient = true;
+        throw error;
+      } finally {
+        // A connection error during unlocking must still destroy the connection.
+        client.release(discardClient);
+        client.removeListener("error", onConnectionError);
+      }
+    }
   }
 
   return result;

@@ -6,6 +6,7 @@ import { LOCK_QUERY_TIMEOUT_MS } from "@/lib/constants/conversation-lock";
 
 import { ConversationLockError, toConversationLockError } from "./lock-error";
 
+/** Returns whether the nonblocking lock was acquired; throws on query failure. */
 export async function acquireLock(
   client: PoolClient,
   key: string

@@ -23,9 +23,10 @@ Keep types, constants, and helpers used by only one implementation beside that
 implementation. `ConversationLockResult` stays in
 `lib/server/conversations/lock/index.ts`; `RuntimeDatabase` stays in
 `lib/server/db/database.ts`. The connection checkout timeout stays in
-`lock/get-db-connection.ts`. The query timeout shared by acquisition and cleanup
-lives in `lib/constants/conversation-lock.ts`, and their shared state type lives
-in `types/server/conversation-lock.ts`.
+`lock/get-db-connection.ts`. The query timeout shared by acquisition and unlocking
+lives in `lib/constants/conversation-lock.ts`. Connection ownership and failure
+flags remain local to the lock orchestrator; helpers receive specific inputs
+instead of sharing a mutable state object.
 
 Infer reusable schema-backed types in `types/chat.ts`; do not duplicate their
 shapes. Import SDK-owned types such as `UIMessage` directly from their packages.
@@ -62,8 +63,10 @@ Introduce new folders only when actual code needs them. If shared UI components
 are added, use `components/`; keep route-specific components beside their routes.
 
 The conversation lock uses four stage modules under `lib/server/conversations/lock/`:
-`index.ts` orchestrates connection checkout, acquisition, the protected operation,
-and cleanup. It is an implementation entry point rather than a catch-all barrel.
+`index.ts` owns the connection lifecycle and coordinates `get-db-connection.ts`,
+`acquire-lock.ts`, and `release-lock.ts`. Unlocking is separate from returning or
+destroying a pool connection, which remains the orchestrator's responsibility.
+The entry point contains implementation rather than catch-all barrel exports.
 Helpers import shared errors from `lib/server/conversations/lock/lock-error.ts` and
 must not import the entry point. See [G09](G09.md) for the module responsibilities.
 

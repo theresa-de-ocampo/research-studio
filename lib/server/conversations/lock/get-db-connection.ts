@@ -7,6 +7,7 @@ import { ConversationLockError, toConversationLockError } from "./lock-error";
 
 const CONNECTION_TIMEOUT_MS = 5_000;
 
+/** Borrows a pool connection with bounded, abortable checkout. */
 export function getDbConnection(signal: AbortSignal): Promise<PoolClient> {
   const pool = getRuntimePool();
 
