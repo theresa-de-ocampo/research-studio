@@ -64,7 +64,7 @@ are added, use `components/`; keep route-specific components beside their routes
 The conversation lock uses four stage modules under `lib/server/conversations/lock/`:
 `index.ts` orchestrates connection checkout, acquisition, the protected operation,
 and cleanup. It is an implementation entry point rather than a catch-all barrel.
-Helpers import shared errors from `lib/server/conversations/lock-error.ts` and
+Helpers import shared errors from `lib/server/conversations/lock/lock-error.ts` and
 must not import the entry point. See [G09](G09.md) for the module responsibilities.
 
 ## Documentation

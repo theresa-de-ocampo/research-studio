@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
 
-// Shared by acquisition, cleanup, and connection-error handling.
+// Shared by operation orchestration, cleanup, and connection-error handling.
 export type ConversationLockState = {
   client: PoolClient | undefined;
   acquired: boolean;

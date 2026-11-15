@@ -71,7 +71,11 @@ export async function withConversationLock<T>(
     client.on("error", onConnectionError);
     controller.signal.throwIfAborted();
 
-    await acquireLock(client, key, state);
+    // If acquisition fails, the connection may still hold the session lock.
+    state.discardClient = true;
+    state.acquired = await acquireLock(client, key);
+    // Preserve any connection failure reported while acquisition was pending.
+    state.discardClient = state.connectionFailed;
 
     controller.signal.throwIfAborted();
     if (state.acquired) {
