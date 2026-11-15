@@ -2,7 +2,7 @@ import "server-only";
 
 import { Pool } from "pg";
 
-import { readRuntimeDatabaseConfig } from "../config/runtime";
+import { readRuntimeDatabaseConfig } from "../environment";
 
 const runtimeGlobal = globalThis as typeof globalThis & {
   researchStudioRuntimePool?: Pool;

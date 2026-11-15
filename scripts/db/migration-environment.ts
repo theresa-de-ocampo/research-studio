@@ -1,22 +1,22 @@
 import "server-only";
 
-import { z } from "zod";
+import { migrationSchema } from "../../lib/schemas/environment";
+import { validateConfig } from "../../lib/server/environment";
 
-import {
-  databaseUrlSchema,
-  getDatabaseTarget,
-} from "../../lib/server/config/database-url";
-import { validateConfig } from "../../lib/server/config/validation";
+function getDatabaseTarget(connectionString: string) {
+  const url = new URL(connectionString);
 
-const migrationSchema = z.object({
-  DATABASE_URL: databaseUrlSchema,
-  MIGRATION_DATABASE_URL: databaseUrlSchema,
-});
+  return {
+    host: decodeURIComponent(url.hostname).toLowerCase(),
+    port: url.port || "5432",
+    database: decodeURI(url.pathname.slice(1))
+  };
+}
 
 export function readMigrationConfig() {
   const config = validateConfig(migrationSchema, {
     DATABASE_URL: process.env.DATABASE_URL,
-    MIGRATION_DATABASE_URL: process.env.MIGRATION_DATABASE_URL,
+    MIGRATION_DATABASE_URL: process.env.MIGRATION_DATABASE_URL
   });
   const runtime = getDatabaseTarget(config.DATABASE_URL);
   const migration = getDatabaseTarget(config.MIGRATION_DATABASE_URL);
@@ -27,7 +27,7 @@ export function readMigrationConfig() {
     runtime.database !== migration.database
   ) {
     throw new Error(
-      "Invalid server configuration: DATABASE_URL and MIGRATION_DATABASE_URL must target the same host, port, and database.",
+      "Invalid server configuration: DATABASE_URL and MIGRATION_DATABASE_URL must target the same host, port, and database."
     );
   }
 
