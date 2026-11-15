@@ -20,9 +20,12 @@ repository root.
 | `docs/` | Goal implementation notes, operational guides, and code navigation. |
 
 Keep types, constants, and helpers used by only one implementation beside that
-implementation. Lock timeouts and `ConversationLockResult` stay in
-`lib/server/conversations/mutation-lock.ts`; `RuntimeDatabase` stays in
-`lib/server/db/database.ts`.
+implementation. `ConversationLockResult` stays in
+`lib/server/conversations/lock/index.ts`; `RuntimeDatabase` stays in
+`lib/server/db/database.ts`. The connection checkout timeout stays in
+`lock/get-db-connection.ts`. The query timeout shared by acquisition and cleanup
+lives in `lib/constants/conversation-lock.ts`, and their shared state type lives
+in `types/server/conversation-lock.ts`.
 
 Infer reusable schema-backed types in `types/chat.ts`; do not duplicate their
 shapes. Import SDK-owned types such as `UIMessage` directly from their packages.
@@ -49,13 +52,20 @@ Private schema fragments and validation predicates stay with their parent schema
 ## Naming and growth
 
 Use short, subject-based filenames such as `chat.ts`, `environment.ts`, and
-`mutation-lock.ts`. Avoid generic `contracts.ts`, `runtime.ts`, or `utils.ts`
+`acquire-lock.ts`. Avoid generic `contracts.ts`, `runtime.ts`, or `utils.ts`
 files and catch-all barrel exports. Several small files with one responsibility
 can be combined when they cover the same subject, as with environment readers.
 
-There is currently no `lib/config/`. Keep lock-specific timeout settings local.
+There is currently no `lib/config/`. Keep implementation-specific timeout settings
+local; put values shared by multiple modules in `lib/constants/`.
 Introduce new folders only when actual code needs them. If shared UI components
 are added, use `components/`; keep route-specific components beside their routes.
+
+The conversation lock uses four stage modules under `lib/server/conversations/lock/`:
+`index.ts` orchestrates connection checkout, acquisition, the protected operation,
+and cleanup. It is an implementation entry point rather than a catch-all barrel.
+Helpers import shared errors from `lib/server/conversations/lock-error.ts` and
+must not import the entry point. See [G09](G09.md) for the module responsibilities.
 
 ## Documentation
 
@@ -69,9 +79,9 @@ covering multiple goals into their corresponding files.
 | G03 | [Server environment configuration](G03.md) |
 | G04 | [Runtime database clients](G04.md) |
 | G05 | [Conversation metadata tables](G05.md) |
+| G06 | [Database roles and setup](G06.md) |
 | G08 | [Application chat contracts](G08.md) |
 | G09 | [Conversation mutation guard](G09.md) |
 
-Keep the task-oriented [database setup](database-setup.md) and
-[database roles](database-roles.md) guides under their descriptive filenames.
+Database setup and role guidance are collected in [G06](G06.md).
 Update imports, documentation links, and tooling source paths when moving files.
