@@ -2,10 +2,15 @@ import "server-only";
 
 import { desc, sql } from "drizzle-orm";
 
+import { createChatError } from "@/lib/chat/errors";
 import { conversationMetadataSchema } from "@/lib/schemas/chat";
 import { getRuntimeDatabase } from "@/lib/server/db/database";
 import { conversations } from "@/lib/server/db/tables";
-import type { ConversationMetadata } from "@/types/chat";
+import type {
+  ChatError,
+  ConversationList,
+  ConversationMetadata,
+} from "@/types/chat";
 
 function toMetadata(
   row: typeof conversations.$inferSelect,
@@ -18,16 +23,25 @@ function toMetadata(
   });
 }
 
-export async function listConversations(): Promise<ConversationMetadata[]> {
-  const rows = await getRuntimeDatabase()
-    .select()
-    .from(conversations)
-    .orderBy(
-      desc(sql`coalesce(${conversations.updatedAt}, ${conversations.createdAt})`),
-      desc(conversations.id),
-    );
+/** Call from a request-time Server Component, without caching the result. */
+export async function listConversations(): Promise<ConversationList | ChatError> {
+  let result: ConversationList | ChatError;
 
-  return rows.map(toMetadata);
+  try {
+    const rows = await getRuntimeDatabase()
+      .select()
+      .from(conversations)
+      .orderBy(
+        desc(sql`coalesce(${conversations.updatedAt}, ${conversations.createdAt})`),
+        desc(conversations.id),
+      );
+
+    result = { conversations: rows.map(toMetadata) };
+  } catch {
+    result = createChatError("database");
+  }
+
+  return result;
 }
 
 export async function createConversation(): Promise<ConversationMetadata> {

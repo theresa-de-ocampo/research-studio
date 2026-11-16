@@ -14,6 +14,7 @@ repository root.
 | `types/` | Reusable application-owned types, grouped by subject. |
 | `lib/constants/` | Shared fixed values, enum-like values, and lookup maps. |
 | `lib/chat/` | Chat behavior usable by both server and client code. |
+| `lib/actions/` | Server Actions that validate input, delegate to server-only behavior, and refresh server-rendered data. |
 | `lib/server/` | Server-side behavior, including environment readers and database access. |
 | `scripts/` | Executable tooling and tooling-specific behavior. |
 | `drizzle/` | Reviewed migration SQL and generated migration metadata. |
@@ -46,6 +47,7 @@ Private schema fragments and validation predicates stay with their parent schema
   clients remain lazy; module imports must not require credentials or connections.
 - `lib/server/db/tables.ts` contains Drizzle source definitions, with no runtime
   client or environment imports. Drizzle tooling can load it independently.
+- Server Action modules use a top-level `"use server"` directive and export only async action functions as runtime values. Keep database operations in `lib/server/`; Server Components call server-only readers directly, outside shared caches.
 - Tooling may reuse application schemas and server helpers. Application modules
   must not import `scripts/`. Migration credential selection and database-target
   comparison stay in `scripts/db/migration-environment.ts`.
@@ -85,6 +87,7 @@ covering multiple goals into their corresponding files.
 | G06 | [Database roles and setup](G06.md) |
 | G08 | [Application chat contracts](G08.md) |
 | G09 | [Conversation mutation guard](G09.md) |
+| G10 | [Conversation creation and listing](G10.md) |
 
 Database setup and role guidance are collected in [G06](G06.md).
 Update imports, documentation links, and tooling source paths when moving files.
