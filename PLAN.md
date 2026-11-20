@@ -4,7 +4,7 @@
 
 This file describes the intended application architecture and v1 scope. It is a reference for agents, not an instruction to implement the entire project or execute the sections in order. Implement only the goal explicitly assigned by the human in the current request.
 
-`AGENTS.md` governs coding conventions and execution boundaries.
+`AGENTS.md` governs coding conventions and execution boundaries. Follow [code structure](docs/code-structure.md) for file placement.
 
 Development will primarily use Codex Cloud, with occasional local Codex sessions. Keep implementation portable between those environments. The app itself remains a personal application intended to run locally.
 
@@ -34,8 +34,8 @@ The app serves one user on localhost without authentication. Tools, attachments,
 - `DATABASE_URL` authenticates as `app_service`. The running application uses this URL exclusively.
 - `MIGRATION_DATABASE_URL` authenticates as `app_migrator`. Only migration and checkpoint-setup tooling uses it.
 - Both URLs must target the same database.
-- Application code validates runtime and migration settings separately; it must never fall back to migration credentials.
-- Create one reusable runtime `pg.Pool` and pass it to both Drizzle and PostgresSaver. Migration tooling uses a separate temporary pool and closes it afterward.
+- Runtime configuration readers live in `lib/server/environment.ts`; migration-only configuration and database-target comparison live in `scripts/db/migration-environment.ts`. Pure validation schemas live in `lib/schemas/environment.ts` and `lib/schemas/database.ts`. Runtime initialization must never fall back to migration credentials, and application modules must not import `scripts/`.
+- Create one reusable runtime `pg.Pool` in `lib/server/db/pool.ts` and pass it to both Drizzle (`lib/server/db/database.ts`) and PostgresSaver (`lib/server/db/checkpointer.ts`). Keep configuration reads and client initialization lazy. Migration tooling uses a separate temporary pool and closes it afterward.
 - Local configuration may contain both URLs in `.env.local`. This separates database permissions; it does not isolate the migration credential from the Next.js process. Runtime initialization must not require migration credentials.
 
 **Permissions and ownership**
@@ -60,13 +60,13 @@ PostgreSQL ownership controls the ability to alter or drop objects, so ownership
 | `langgraph.checkpoint_migrations` | PostgresSaver | None              |
 | `drizzle.__drizzle_migrations`    | Drizzle       | None              |
 
-Define `conversations` with UUID `id`, non-null `title`, non-null timezone-aware `created_at` defaulting to creation time, and nullable timezone-aware `updated_at` with no default. Leave `updated_at` null on creation and set it explicitly on subsequent activity. Index and list by `coalesce(updated_at, created_at) DESC, id DESC` so new and updated conversations share newest-activity ordering with a deterministic tie-breaker. Use its UUID as LangGraph’s `thread_id`.
+Define `public.conversations` in `lib/server/db/tables.ts` with UUID `id`, non-null `title`, non-null timezone-aware `created_at` defaulting to creation time, and nullable timezone-aware `updated_at` with no default. Leave `updated_at` null on creation and set it explicitly on subsequent activity. Index and list by `coalesce(updated_at, created_at) DESC, id DESC` so new and updated conversations share newest-activity ordering with a deterministic tie-breaker. Use its UUID as LangGraph’s `thread_id`.
 
 Store messages only in checkpoint state; do not create a duplicate messages table. Retrieve transcripts through `graph.getState()`.
 
 **Database setup design**
 
-Drizzle owns conversation metadata migrations; PostgresSaver owns its checkpoint schema. The intended setup uses `MIGRATION_DATABASE_URL` for Drizzle migrations and `PostgresSaver.setup()` with the `langgraph` schema, followed by the required runtime grants. Setup must preserve existing conversations.
+Drizzle owns conversation metadata migrations; PostgresSaver owns its checkpoint schema. Setup uses `MIGRATION_DATABASE_URL` for Drizzle migrations and `PostgresSaver.setup()` with the `langgraph` schema and must preserve existing conversations.
 
 The tooling includes `db:generate`, `db:migrate`, `db:checkpoint-setup`, and `db:setup`. Combined setup performs metadata migrations followed by checkpoint setup. Grants and default privileges remain separate human-managed operations; the commands do not modify them. See [database setup](docs/G06.md#human-invoked-database-setup) and [role provisioning](docs/G06.md#human-managed-database-roles-and-privileges). These are commands for human execution, not commands for an agent to execute from this overview. Any work on this tooling must be explicitly scoped and remain subject to `AGENTS.md`.
 
@@ -76,7 +76,8 @@ Database setup and migrations are explicit human-managed operations. Never run t
 
 **Graph and model**
 
-- Keep database access, configuration, and model execution in server-only modules using the Node.js runtime.
+- Keep database access, configuration, and model execution in server-only modules using the default Node.js runtime.
+- Keep saved-conversation reads in `lib/conversations/getter.ts` and UI metadata mutations directly in `lib/actions/conversation.ts`; keep model execution in `lib/server/chat/graph.ts` and turn execution/recovery in `lib/server/chat/turns.ts`.
 - Build a typed graph using `StateSchema` and `MessagesValue`: `START → callModel → END`.
 - Use `ChatOpenAI` with the Responses API and `store: false`.
 - Read the model from `OPENAI_MODEL`; do not hard-code a model or require a frontend picker.
@@ -89,33 +90,35 @@ Database setup and migrations are explicit human-managed operations. Never run t
 - Use `useChat` and `DefaultChatTransport` on the frontend.
 - Send the latest user message and its stable ID instead of resubmitting the full transcript.
 - Convert LangGraph streams through `@ai-sdk/langchain` into the standard AI SDK UI message stream.
-- Use a shared typed `UIMessage` representation for streamed and loaded messages, with Zod validation at external boundaries.
+- Import SDK-owned `UIMessage` directly from `ai` for streamed and loaded messages; use the SDK validator when runtime message validation is needed. Keep application Zod schemas in `lib/schemas/chat.ts`, schema-inferred application types in `types/chat.ts`, fixed error/identity values in `lib/constants/chat.ts`, and browser-safe identity/error helpers in `lib/chat/`.
 - Preserve canonical message IDs across checkpoints, streaming, and reloads.
 - Let the response wrapper control message start/finish boundaries.
-- Keep transcript persistence in LangGraph; frontend completion callbacks refresh metadata and reconcile state.
+- Keep transcript persistence in LangGraph. After completion, cancellation, or failure settles, refresh server-rendered metadata/history and reconcile the selected conversation's client messages and pending-turn state without stale refreshes overwriting another conversation or an active turn.
 
 The official adapter supports converting LangGraph streams for AI SDK UI. [Adapter documentation](https://ai-sdk.dev/providers/adapters/langchain)
 
-**Endpoints**
+**Server reads, actions, and streaming**
 
-| Endpoint                                | Behavior                                             |
-| --------------------------------------- | ---------------------------------------------------- |
-| `GET /api/conversations`                | List metadata by newest activity                     |
-| `POST /api/conversations`               | Create a conversation                                |
-| `GET /api/conversations/[id]`           | Return metadata, UI messages, and pending-turn state |
-| `PATCH /api/conversations/[id]`         | Rename                                               |
-| `DELETE /api/conversations/[id]`        | Delete checkpoints, then metadata                    |
-| `POST /api/conversations/[id]/messages` | Submit or retry a turn; stream the response          |
+| Behavior                                                  | Boundary                                                              | Location                                       |
+| --------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------- |
+| List metadata by newest activity                          | Direct server-only read from Server Components                        | `lib/conversations/getter.ts`         |
+| Create a conversation with a “New chat” placeholder title | Server Action                                                         | `lib/actions/conversation.ts`                 |
+| Load metadata, UI messages, and pending-turn state        | Direct server-only read for Server Components and turn reconciliation | `lib/conversations/getter.ts`          |
+| Rename                                                    | Server Action                                                         | `lib/actions/conversation.ts`                 |
+| Delete checkpoints, then metadata                         | Server Action                                                         | `lib/actions/conversation.ts`                 |
+| Submit or retry a turn and stream the response            | `POST /api/conversations/[id]/messages`                               | `app/api/conversations/[id]/messages/route.ts` |
 
-Follow the installed Next.js documentation, including asynchronous route parameters and Cache Components behavior. Read conversation data at request time.
+Server Components call readers directly. All Server Actions live in `lib/actions/`, use module-level `'use server'`, and export only async action functions as runtime values. Validate inputs, implement the UI mutation directly in its action using shared server-only infrastructure, return serializable data or sanitized errors, and refresh server-rendered data after successful mutations. Metadata timestamps use `Date` instances validated by `z.date()`; parse database rows directly without date-conversion helpers. The messages Route Handler is the sole application API endpoint; it delegates to the turn runner, maps shared errors to HTTP status responses before streaming, and reports later failures through the AI SDK stream protocol.
+
+Follow the installed Next.js documentation, including asynchronous page/route parameters and Cache Components behavior. Keep conversation reads request-time through the calling Server Components; do not globally cache metadata or transcripts. Use the default Node.js runtime without a `runtime` route export.
 
 **Recovery and concurrency**
 
 - Use stable message IDs to prevent duplicate submissions and replies.
-- Serialize mutations per conversation using PostgreSQL advisory locks; reject overlapping operations with a busy response.
-- Propagate Stop and request cancellation to graph/model execution.
+- Serialize mutations to an existing conversation using the guard in `lib/server/conversations/lock/index.ts`; rename, deletion, and turn execution use the same PostgreSQL advisory lock. Hold it until all writes, stream production, checkpoint completion, and cancellation cleanup settle; reject overlapping operations with a busy result.
+- Stop aborts the active streaming request; propagate request cancellation to graph/model execution.
 - Treat partial streamed assistant text as provisional; committed messages survive interruption.
-- Retry unfinished turns using the original user-message ID and pending graph work after reconciling persisted history.
+- Retry unfinished turns through the same messages endpoint using the original user-message ID and pending graph work after reconciling persisted history. Stop and Retry require no additional endpoints.
 - Do not expose regeneration of completed answers in v1.
 - Make deletion retryable and report cleanup failures.
 - Do not add background generation or a resumable token-stream service.
@@ -124,10 +127,10 @@ Follow the installed Next.js documentation, including asynchronous route paramet
 
 **Interface**
 
-- Adapt the current shadcn Base UI Chat, Message, and Prompt Input patterns into project-owned components. Use the current shadcn patterns rather than the older AI Elements registry. [Component guidance](https://ui.shadcn.com/docs/ai-elements)
+- Adapt the current shadcn Base UI Chat, Message, and Prompt Input patterns into project-owned components in `components/chat/`. Use the current shadcn patterns rather than the older AI Elements registry. [Component guidance](https://ui.shadcn.com/docs/ai-elements)
 - Provide a desktop sidebar and mobile drawer with New chat, selection, rename, and confirmed deletion.
-- Use `/` for the new-chat screen and `/chat/[id]` for saved conversations.
-- Load persisted history before initializing each conversation’s chat instance. Switching conversations cancels the previous request and isolates message state.
+- Use `app/page.tsx` for `/` and `app/chat/[id]/page.tsx` for saved conversations at `/chat/[id]`. Create new conversations through the Server Action before navigation or streaming.
+- Load the sidebar metadata and persisted history in Server Components before initializing each conversation’s chat instance. Pass serializable results to the interactive client components. Switching conversations cancels the previous request and isolates message state; cancellation must also handle route hiding, effect cleanup, and disposal.
 - Use a centered transcript, user bubbles, assistant Markdown responses, and a multiline composer below the transcript.
 - Use neutral styling, system light/dark appearance, and the existing Geist font.
 - Render Markdown with Streamdown, including GFM tables, highlighted code, and copy controls; disable raw HTML.
@@ -136,6 +139,7 @@ Follow the installed Next.js documentation, including asynchronous route paramet
 - Follow streaming output only while the user remains at the live edge.
 - Provide accessible keyboard controls and empty, loading, missing-conversation, database-error, and generation-error states.
 - Derive the initial conversation title from the first message without an additional model call.
+- Keep goal notes in `docs/<goal-ID>.md` and the operation runbook in `docs/G25.md`, linked from the short root README.
 
 **Packages**
 
