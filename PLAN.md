@@ -77,7 +77,7 @@ Database setup and migrations are explicit human-managed operations. Never run t
 **Graph and model**
 
 - Keep database access, configuration, and model execution in server-only modules using the default Node.js runtime.
-- Keep saved-conversation management and history loading in `lib/server/conversations/`; keep model execution in `lib/server/chat/graph.ts` and turn execution/recovery in `lib/server/chat/turns.ts`.
+- Keep saved-conversation reads in `lib/conversations/getter.ts` and UI metadata mutations directly in `lib/actions/conversation.ts`; keep model execution in `lib/server/chat/graph.ts` and turn execution/recovery in `lib/server/chat/turns.ts`.
 - Build a typed graph using `StateSchema` and `MessagesValue`: `START → callModel → END`.
 - Use `ChatOpenAI` with the Responses API and `store: false`.
 - Read the model from `OPENAI_MODEL`; do not hard-code a model or require a frontend picker.
@@ -101,14 +101,14 @@ The official adapter supports converting LangGraph streams for AI SDK UI. [Adapt
 
 | Behavior                                                  | Boundary                                                              | Location                                       |
 | --------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------- |
-| List metadata by newest activity                          | Direct server-only read from Server Components                        | `lib/server/conversations/metadata.ts`         |
-| Create a conversation with a “New chat” placeholder title | Server Action                                                         | `lib/actions/conversations.ts`                 |
-| Load metadata, UI messages, and pending-turn state        | Direct server-only read for Server Components and turn reconciliation | `lib/server/conversations/history.ts`          |
-| Rename                                                    | Server Action                                                         | `lib/actions/conversations.ts`                 |
-| Delete checkpoints, then metadata                         | Server Action                                                         | `lib/actions/conversations.ts`                 |
+| List metadata by newest activity                          | Direct server-only read from Server Components                        | `lib/conversations/getter.ts`         |
+| Create a conversation with a “New chat” placeholder title | Server Action                                                         | `lib/actions/conversation.ts`                 |
+| Load metadata, UI messages, and pending-turn state        | Direct server-only read for Server Components and turn reconciliation | `lib/conversations/getter.ts`          |
+| Rename                                                    | Server Action                                                         | `lib/actions/conversation.ts`                 |
+| Delete checkpoints, then metadata                         | Server Action                                                         | `lib/actions/conversation.ts`                 |
 | Submit or retry a turn and stream the response            | `POST /api/conversations/[id]/messages`                               | `app/api/conversations/[id]/messages/route.ts` |
 
-Server Components call readers directly. All Server Actions live in `lib/actions/`, use module-level `'use server'`, and export only async action functions as runtime values. Validate inputs, delegate to server-only behavior, return serializable data or sanitized errors, and refresh server-rendered data after successful mutations. The messages Route Handler is the sole application API endpoint; it delegates to the turn runner, maps shared errors to HTTP status responses before streaming, and reports later failures through the AI SDK stream protocol.
+Server Components call readers directly. All Server Actions live in `lib/actions/`, use module-level `'use server'`, and export only async action functions as runtime values. Validate inputs, implement the UI mutation directly in its action using shared server-only infrastructure, return serializable data or sanitized errors, and refresh server-rendered data after successful mutations. Metadata timestamps use `Date` instances validated by `z.date()`; parse database rows directly without date-conversion helpers. The messages Route Handler is the sole application API endpoint; it delegates to the turn runner, maps shared errors to HTTP status responses before streaming, and reports later failures through the AI SDK stream protocol.
 
 Follow the installed Next.js documentation, including asynchronous page/route parameters and Cache Components behavior. Keep conversation reads request-time through the calling Server Components; do not globally cache metadata or transcripts. Use the default Node.js runtime without a `runtime` route export.
 

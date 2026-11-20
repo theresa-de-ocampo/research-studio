@@ -35,8 +35,8 @@ export const renameInputSchema = z.strictObject({
 export const conversationMetadataSchema = z.strictObject({
   id: conversationIdSchema,
   title: conversationTitleSchema,
-  createdAt: z.iso.datetime({ offset: true }),
-  updatedAt: z.iso.datetime({ offset: true }).nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date().nullable(),
 });
 
 export const pendingTurnSchema = z.strictObject({
