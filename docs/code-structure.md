@@ -7,22 +7,22 @@ The existing `@/*` alias points to the repository root.
 
 ## Where code belongs
 
-| Location | Responsibility |
-| --- | --- |
-| `app/` | Next.js routes, layouts, and route-specific UI. |
-| `lib/schemas/` | Pure runtime validation contracts grouped by subject. |
-| `types/` | Reusable application-owned types, grouped by subject. |
-| `lib/constants/` | Shared fixed values, enum-like values, and lookup maps. |
-| `lib/chat/` | Chat behavior usable by both server and client code. |
-| `lib/actions/` | Server Actions implementing UI mutations, sanitized errors, and refresh after success. |
-| `lib/<feature>/getter.ts` | Server-only feature reads called directly by Server Components or other server code. |
-| `lib/server/` | Server infrastructure, environment readers, database clients, locking, and model/turn execution. |
-| `scripts/` | Executable tooling and tooling-specific behavior. |
-| `drizzle/` | Reviewed migration SQL and generated migration metadata. |
-| `docs/` | Goal implementation notes, operational guides, and code navigation. |
+| Location                         | Responsibility                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `app/`                           | Next.js routes, layouts, and route-specific UI.                                                  |
+| `lib/schemas/`                   | Pure runtime validation contracts grouped by subject.                                            |
+| `types/`                         | Reusable application-owned types, grouped by subject.                                            |
+| `lib/constants/`                 | Shared fixed values, enum-like values, and lookup maps.                                          |
+| `lib/chat/`                      | Chat behavior usable by both server and client code.                                             |
+| `lib/actions/`                   | Server Actions implementing UI mutations, sanitized errors, and refresh after success.           |
+| `lib/server/<feature>/getter.ts` | Server-only feature reads called directly by Server Components or other server code.             |
+| `lib/server/`                    | Server infrastructure, environment readers, database clients, locking, and model/turn execution. |
+| `scripts/`                       | Executable tooling and tooling-specific behavior.                                                |
+| `drizzle/`                       | Reviewed migration SQL and generated migration metadata.                                         |
+| `docs/`                          | Goal implementation notes, operational guides, and code navigation.                              |
 
 Keep conversation creation directly in `lib/actions/conversation.ts` and listing
-in `lib/conversations/getter.ts`. Do not add a separate mutation repository or
+in `lib/server/conversations/getter.ts`. Do not add a separate mutation repository or
 conversion helper for a single action's insert. Shared infrastructure such as the
 database client and conversation lock stays in `lib/server/`. Streaming and
 checkpoint writes remain part of server-side turn execution.
@@ -101,15 +101,15 @@ Keep the root [README](../README.md) as a short entry point and
 implementation notes in `docs/<goal-ID>.md`, without nested READMEs. Split notes
 covering multiple goals into their corresponding files.
 
-| Goal | Notes |
-| --- | --- |
-| G03 | [Server environment configuration](G03.md) |
-| G04 | [Runtime database clients](G04.md) |
-| G05 | [Conversation metadata tables](G05.md) |
-| G06 | [Database roles and setup](G06.md) |
-| G08 | [Application chat contracts](G08.md) |
-| G09 | [Conversation mutation guard](G09.md) |
-| G10 | [Conversation creation and listing](G10.md) |
+| Goal | Notes                                       |
+| ---- | ------------------------------------------- |
+| G03  | [Server environment configuration](G03.md)  |
+| G04  | [Runtime database clients](G04.md)          |
+| G05  | [Conversation metadata tables](G05.md)      |
+| G06  | [Database roles and setup](G06.md)          |
+| G08  | [Application chat contracts](G08.md)        |
+| G09  | [Conversation mutation guard](G09.md)       |
+| G10  | [Conversation creation and listing](G10.md) |
 
 Database setup and role guidance are collected in [G06](G06.md).
 Update imports, documentation links, and tooling source paths when moving files.
