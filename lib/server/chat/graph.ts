@@ -1,7 +1,13 @@
 import "server-only";
 
 import { HumanMessage } from "@langchain/core/messages";
-import { END, MessagesValue, START, StateGraph, StateSchema } from "@langchain/langgraph";
+import {
+  END,
+  MessagesValue,
+  START,
+  StateGraph,
+  StateSchema
+} from "@langchain/langgraph";
 import type { GraphNode } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 
@@ -14,7 +20,10 @@ const stateSchema = new StateSchema({ messages: MessagesValue });
 
 let model: ChatOpenAI | undefined;
 
-const callModel: GraphNode<typeof stateSchema> = async ({ messages }, config) => {
+const callModel: GraphNode<typeof stateSchema> = async (
+  { messages },
+  config
+) => {
   const userMessage = messages.at(-1);
 
   if (!HumanMessage.isInstance(userMessage) || userMessage.id === undefined) {
@@ -26,12 +35,14 @@ const callModel: GraphNode<typeof stateSchema> = async ({ messages }, config) =>
     ...readModelConfig(),
     useResponsesApi: true,
     zdrEnabled: true,
-    modelKwargs: { store: false },
+    // Explicitly disables OpenAI response storage for later API retrieval.
+    // Postgres supplies the conversation history for the next turn.
+    modelKwargs: { store: false }
   });
 
   const response = await model.invoke(messages, {
     ...config,
-    include: ["reasoning.encrypted_content"],
+    include: ["reasoning.encrypted_content"]
   });
 
   response.id = assistantId;
@@ -50,10 +61,13 @@ export function getConversationGraph() {
   return compiledGraph;
 }
 
-export function getConversationGraphConfig(conversationId: string, signal?: AbortSignal) {
+export function getConversationGraphConfig(
+  conversationId: string,
+  signal?: AbortSignal
+) {
   return {
     configurable: { thread_id: conversationIdSchema.parse(conversationId) },
-    durability: "sync" as const,
-    signal,
+    durability: "sync" as const, // Makes execution wait for checkpoint writes
+    signal
   };
 }
