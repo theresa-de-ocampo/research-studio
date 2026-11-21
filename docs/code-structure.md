@@ -110,6 +110,7 @@ covering multiple goals into their corresponding files.
 | G08  | [Application chat contracts](G08.md)        |
 | G09  | [Conversation mutation guard](G09.md)       |
 | G10  | [Conversation creation and listing](G10.md) |
+| G12  | [Conversation history](G12.md)               |
 
 Database setup and role guidance are collected in [G06](G06.md).
 Update imports, documentation links, and tooling source paths when moving files.
